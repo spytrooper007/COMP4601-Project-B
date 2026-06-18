@@ -4,12 +4,12 @@
 
 **Team Name: IDK yet tbh**
 
-| Member | zID | Role |
+| Member | zID | Email | Role |
 |---|---|---|
-| Gilbert Tong | | |
-| Shuruthy Dhushiyandan | |  |
-| Iris Martin | |  |
-| Kaira Dumasia | |  |
+| Gilbert Tong | z5421556 | z5421556@ad.unsw.edu.au | | Email representative |
+| Shuruthy Dhushiyandan | | | |  |
+| Iris Martin | | | |  |
+| Kaira Dumasia | | | |  |
 
 ## 2. Project Overview / Abstract
 
