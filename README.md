@@ -1,4 +1,4 @@
-# [Hardware Acceleration of "something" on the Kria KV260]
+# [Hardware Acceleration of Convolutional Neural Networks on the Kria KV260]
 
 ## 1. Team Information
 
