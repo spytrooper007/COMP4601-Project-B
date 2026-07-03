@@ -7,8 +7,8 @@
 | Member | zID | Email | Role |
 |---|---|---|---|
 | Gilbert Tong | z5421556 | z5421556@ad.unsw.edu.au | Email representative |
-| Shuruthy Dhushiyandan | | |  |
-| Kaira Dumasia | z5441876 | z5441876@ad.unsw.edu.au |  |
+| Shuruthy Dhushiyandan | z5479689 | z5479689@ad.unsw.edu.au | Meeting minutes |
+| Kaira Dumasia | z5441876 | z5441876@ad.unsw.edu.au | Project progess checker |
 
 ## 2. Project Overview / Abstract
 
