@@ -30,8 +30,6 @@ void flattenLayer(
 		flat_H: for (h = 0; h < CONV2_MAXPOOL_FINAL_HEIGHT; h++){
 			flat_W: for (w = 0; w < CONV2_MAXPOOL_FINAL_WIDTH; w++){
 
-#pragma HLS PIPELINE II=1
-
 				// Copy each value into a unidimensional array
 				output_features[f*CONV2_MAXPOOL_FINAL_HEIGHT*CONV2_MAXPOOL_FINAL_WIDTH+ h*CONV2_MAXPOOL_FINAL_WIDTH+ w] = input_features[f][h][w];
 			}

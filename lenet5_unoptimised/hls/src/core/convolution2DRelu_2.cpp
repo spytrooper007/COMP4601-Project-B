@@ -35,8 +35,6 @@ void convolution2DRelu_2(
 		conv2_FH: for (fh = 0; fh < CONV2_CONVOLVED_FEATURE_HEIGHT; fh++) {
 			conv2_FW: for (fw = 0; fw < CONV2_CONVOLVED_FEATURE_WIDTH; fw++) {
 
-#pragma HLS PIPELINE II=1
-
 				// Reset accumulated value
 				accumulated = 0.0f;
 				// Go through the kernel rows and columns
@@ -45,8 +43,6 @@ void convolution2DRelu_2(
 
 						// Convolve each feature with the corresponding kernel and add the result
 						conv2_F: for (f = 0; f < CONV1_KERNELS; f++) {
-
-#pragma HLS EXPRESSION_BALANCE
 
 							accumulated += input_features[f][fh + kh][fw + kw] * input_kernels[k][f][kh][kw];
 						}

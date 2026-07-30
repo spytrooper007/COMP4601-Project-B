@@ -1,15 +1,19 @@
 #include "conv5x5.h"
 
 /*
- * Hardware 5x5 convolution + ReLU kernel for Vitis HLS.
+ * Hardware 5x5 convolution + ReLU kernel for Vitis HLS -- UNOPTIMISED BASELINE.
+ *
+ * No performance pragmas (no PIPELINE / UNROLL / ARRAY_PARTITION): the six-deep
+ * loop nest runs sequentially, reusing a single multiply-add unit. This is the
+ * baseline that the optimised version is measured against.
  *
  * Loop structure (the "six deep loop nest" from the project slides):
  *   OC  - output channel / kernel
  *   OH  - output row
- *   OW  - output col        <- pipelined, one output pixel per iteration
- *     IC/KH/KW              <- fully unrolled 5x5 window (all 25 MACs at once)
+ *   OW  - output col
+ *     IC/KH/KW           - the 5x5 window (25 MACs), evaluated one at a time
  *
- * Inputs/weights are streamed once into on-chip BRAM so each input pixel is
+ * Inputs/weights are still copied once into on-chip BRAM so each input pixel is
  * reused across the sliding window instead of re-fetched over AXI.
  */
 void conv5x5(const float *input,
@@ -27,10 +31,6 @@ void conv5x5(const float *input,
     float in_buf[IN_CH][IN_H][IN_W];
     float w_buf[OUT_CH][IN_CH][K][K];
     float b_buf[OUT_CH];
-    /* Partition the small dimensions so the 25-tap window MACs run in parallel. */
-#pragma HLS ARRAY_PARTITION variable=w_buf complete dim=3
-#pragma HLS ARRAY_PARTITION variable=w_buf complete dim=4
-#pragma HLS ARRAY_PARTITION variable=in_buf complete dim=1
 
     /* Load weights into BRAM. */
     load_w: for (int oc = 0; oc < OUT_CH; oc++)
@@ -52,12 +52,10 @@ void conv5x5(const float *input,
     conv_OC: for (int oc = 0; oc < OUT_CH; oc++) {
         conv_OH: for (int oh = 0; oh < OUT_H; oh++) {
             conv_OW: for (int ow = 0; ow < OUT_W; ow++) {
-#pragma HLS PIPELINE II=1
                 float acc = 0.0f;
                 conv_IC: for (int ic = 0; ic < IN_CH; ic++) {
                     conv_KH: for (int kh = 0; kh < K; kh++) {
                         conv_KW: for (int kw = 0; kw < K; kw++) {
-#pragma HLS UNROLL
                             acc += in_buf[ic][oh + kh][ow + kw] *
                                    w_buf[oc][ic][kh][kw];
                         }

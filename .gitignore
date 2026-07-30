@@ -1,0 +1,34 @@
+# Vitis / Vivado build + IDE artifacts (regenerated — never commit)
+_ide/
+.Xil/
+.cache/
+.vitisWorkspace.json
+compile_commands.json
+
+# HLS component work dirs (regenerated from hls_config.cfg; work_dir = cnn)
+**/lenet5_hls/cnn/
+**/conv5x5_hls/conv5x5/
+
+# System build + package outputs
+build/
+binary_container_1/
+package.build/
+*.xo
+*.xclbin
+*.bin
+*.pdi
+*.xsa
+*.dtbo
+
+# Host build outputs / compiled C-sim binaries
+export/
+*.o
+*.d
+csim
+*_csim
+
+# logs / misc
+logs/
+*.log
+*.lock
+.DS_Store

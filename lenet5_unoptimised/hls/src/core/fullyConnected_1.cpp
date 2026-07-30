@@ -28,14 +28,10 @@ void fullyConnected_1(
 	// Go through all the values of that feature
 	fc1_F: for (f = 0; f < FC1_FEATURES; f++) {
 
-#pragma HLS PIPELINE II=1
-
 		accumulated = 0.0f;
 
 		// For each feature
 		fc1_NIF: for (nif = 0; nif < FC1_INPUT_FEATURES; nif++) {
-
-#pragma HLS EXPRESSION_BALANCE
 
 			accumulated += input_features[nif] * input_weights[f][nif];
 		}

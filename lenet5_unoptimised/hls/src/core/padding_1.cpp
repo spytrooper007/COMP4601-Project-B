@@ -29,8 +29,6 @@ void padding_1(
 
 			pad1_W: for (w = 0; w < IMAGE_WIDTH + 2*PADDING; w++) {
 
-#pragma HLS PIPELINE II=1
-
 				// Fill left and right columns with 0.0
 				// Fill top and bottom rows with 0.0
 				if (w < PADDING || w > IMAGE_WIDTH + PADDING -1 ||

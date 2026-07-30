@@ -29,8 +29,6 @@ void padding_2(
 
 			pad2_W: for (w = 0; w < CONV1_MAXPOOL_FINAL_WIDTH + 2*PADDING; w++) {
 
-#pragma HLS PIPELINE II=1
-
 				// Fill left and right columns with 0.0
 				// Fill top and bottom rows with 0.0
 				if (w < PADDING || w > CONV1_MAXPOOL_FINAL_WIDTH + PADDING -1 ||
