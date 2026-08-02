@@ -18,8 +18,6 @@ void conv5x5(const float *input,
 #pragma HLS ARRAY_PARTITION variable=w_buf complete dim=3
 #pragma HLS ARRAY_PARTITION variable=w_buf complete dim=4
 #pragma HLS ARRAY_PARTITION variable=in_buf complete dim=1
-#pragma HLS ARRAY_PARTITION variable=in_buf complete dim=2
-#pragma HLS ARRAY_PARTITION variable=in_buf complete dim=3
 
     load_w: for (int oc = 0; oc < OUT_CH; oc++)
         for (int ic = 0; ic < IN_CH; ic++)

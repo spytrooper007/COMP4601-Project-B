@@ -16,8 +16,8 @@
 
 #ifdef __SYNTHESIS__
 #include <ap_fixed.h>
-typedef ap_fixed<16, 6>  data_t;
-typedef ap_fixed<32, 12> acc_t;
+typedef ap_fixed<20, 8>  data_t;
+typedef ap_fixed<40, 16> acc_t;
 #else
 typedef float data_t;
 typedef float acc_t;

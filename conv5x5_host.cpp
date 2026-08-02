@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
     double rmse = std::sqrt(sum_sq / OUT_SIZE);
     std::cout << "----------------------------------------------\n";
     printf("Conv5x5 RMSE : %0.15f\n", rmse);
-    std::cout << (rmse > 2e-3 ? "FAIL: does not match golden output\n"
+    std::cout << (rmse > 1e-3 ? "FAIL: does not match golden output\n"
                               : "PASS: matches golden output\n");
     std::cout << "----------------------------------------------\n";
 
