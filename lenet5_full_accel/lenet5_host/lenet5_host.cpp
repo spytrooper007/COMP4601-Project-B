@@ -109,11 +109,13 @@ int main(int argc, char **argv) {
     parser.addSwitch("--format",      "-f", "custom image format: raw|unit|std", "raw");
     parser.addSwitch("--num",         "-n", "number of MNIST images to test", "100");
     parser.addSwitch("--label",       "-l", "true label for the custom image (optional)", "-1");
+    parser.addSwitch("--sw_image",    "-s", "custom 28x28 image file for SOFTWARE-only inference (784 values)", "");
     parser.parse(argc, argv);
 
     std::string binaryFile = parser.value("xclbin_file");
     int device_index       = stoi(parser.value("device_id"));
     std::string imgFile    = parser.value("image");
+    std::string swImgFile  = parser.value("sw_image");
     std::string fmt        = parser.value("format");
     int num                = stoi(parser.value("num"));
     int userLabel          = stoi(parser.value("label"));
@@ -143,13 +145,47 @@ int main(int argc, char **argv) {
         for (int i = 0; i < FC2_FEATURES; i++) logits[i] = p_out[i];
     };
 
+    /* ---------------- Mode 3: custom image, SOFTWARE ONLY ---------------- */
+    if (!swImgFile.empty()) {
+        static float img[IMAGE_FEATURES][IMAGE_HEIGHT][IMAGE_WIDTH];
+        if (!load_image(swImgFile, fmt, img)) return EXIT_FAILURE;
+ 
+        float logits[FC2_FEATURES], probs[FC2_FEATURES];
+        auto sw_t0 = std::chrono::high_resolution_clock::now();
+        cnn(img, logits);                 // plain ARM software, no FPGA at all
+        auto sw_t1 = std::chrono::high_resolution_clock::now();
+        double arm_us = std::chrono::duration<double>(sw_t1 - sw_t0).count() * 1e6;
+ 
+        softmax10(logits, probs);
+        int pred = argmax10(logits);
+ 
+        std::cout << "\nInput image (" << fmt << " format):\n";
+        print_ascii(img);
+        std::cout << "\n digit :   logit    probability\n";
+        std::cout << "-------------------------------\n";
+        for (int i = 0; i < FC2_FEATURES; i++)
+            printf("   %d   : %8.3f   %6.2f%%%s\n", i, logits[i], probs[i] * 100.0f,
+                   (i == pred) ? "   <== predicted" : "");
+        printf("\nPredicted digit: %d\n", pred);
+        printf("ARM  time : %0.3f us\n", arm_us);
+        if (userLabel >= 0)
+            std::cout << (pred == userLabel ? "CORRECT" : "WRONG")
+                      << " (expected " << userLabel << ")\n";
+        return 0;
+    }
+
+
     /* ---------------- Mode 2: custom image ---------------- */
     if (!imgFile.empty()) {
         static float img[IMAGE_FEATURES][IMAGE_HEIGHT][IMAGE_WIDTH];
         if (!load_image(imgFile, fmt, img)) return EXIT_FAILURE;
 
         float logits[FC2_FEATURES], probs[FC2_FEATURES];
+        auto hw_t0 = std::chrono::high_resolution_clock::now();
         run_fpga(img, logits);
+        auto hw_t1 = std::chrono::high_resolution_clock::now();
+        double fpga_us = std::chrono::duration<double>(hw_t1 - hw_t0).count() * 1e6;
+        
         softmax10(logits, probs);
         int pred = argmax10(logits);
 
@@ -161,6 +197,7 @@ int main(int argc, char **argv) {
             printf("   %d   : %8.3f   %6.2f%%%s\n", i, logits[i], probs[i] * 100.0f,
                    (i == pred) ? "   <== predicted" : "");
         printf("\nPredicted digit: %d\n", pred);
+        printf("FPGA time : %0.3f us\n", fpga_us);
         if (userLabel >= 0)
             std::cout << (pred == userLabel ? "CORRECT" : "WRONG")
                       << " (expected " << userLabel << ")\n";
