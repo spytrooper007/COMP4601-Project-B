@@ -9,7 +9,7 @@ methodology** — the CNN is the representative workload.
 
 | Folder | What | Latency¹ | Speedup | LUT | Accuracy |
 |--------|------|---------:|--------:|----:|:--------:|
-| [`lenet5_unoptimised/`](lenet5_unoptimised) | Baseline — sequential, no perf pragmas | 6011 µs | 1.0× | 21% | 100% |
+| [`lenet5_unoptimised/`](lenet5_unoptimised) | Baseline: sequential, no perf pragmas | 6011 µs | 1.0× | 21% | 100% |
 | [`lenet5_conv_accel/`](lenet5_conv_accel) | Convolution layers accelerated (fixed-point + adder tree) | 2057 µs | 2.9× | 36% | 100% |
 | [`lenet5_full_accel/`](lenet5_full_accel) | Conv **and** FC accelerated (FC unroll ×16) — **best / deployed** | **69.5 µs** | **87×** | 77% | 100% |
 | [`conv5x5_unoptimised/`](conv5x5_unoptimised) | Standalone single 5×5 conv accelerator (baseline) | — | — | — | 100% |
@@ -22,9 +22,9 @@ test set, verified in both float and the `ap_fixed<20,8>` fixed-point datapath.
 · how-to for going further: [`lenet5_full_accel/ACCELERATION_GUIDE.md`](lenet5_full_accel/ACCELERATION_GUIDE.md).
 
 ### Headline findings
-- Accelerating the **conv alone** only gave 2.9× — the real bottleneck was FC1.
+- Accelerating the **conv alone** only gave 2.9×, the real bottleneck was FC1.
 - Accelerating the **FC layers** unlocked the jump to 72–87×.
-- **Maxing out LUTs on the conv backfired** — a channel-parallel conv hit 109% LUT
+- **Maxing out LUTs on the conv backfired**: a channel-parallel conv hit 109% LUT
   (won't route) for no real speedup, while feeding the FC bottleneck (unroll ×16)
   was faster *and* fit at 77%.
 
@@ -34,9 +34,9 @@ test set, verified in both float and the `ap_fixed<20,8>` fixed-point datapath.
 
 `lenet5_full_accel` is the best deployed design. There are three levels of
 testing, from easiest to most complete. **Level 1 needs nothing but a C++
-compiler** — start there.
+compiler**, start there.
 
-## Level 1 — Verify accuracy on any PC (no board, no Vitis, ~2 min)
+## Level 1: Verify accuracy on any PC (no board, no Vitis, ~2 min)
 
 The HLS kernel is plain C++ (the hardware pragmas are ignored by a normal
 compiler), so the whole network runs on any Linux/macOS machine with `g++`.
@@ -65,7 +65,7 @@ That confirms the design is functionally correct. (This is the **float** path;
 the on-board hardware uses `ap_fixed<20,8>`, which we verified separately also
 gives 100%.)
 
-## Level 2 — Reproduce the performance numbers in Vitis (C-synthesis, no board)
+## Level 2: Reproduce the performance numbers in Vitis (C-synthesis, no board)
 
 This regenerates the 69.5 µs latency and 77% LUT figures. Needs **AMD Vitis
 2025.x** (Unified IDE) installed.
@@ -85,7 +85,7 @@ This regenerates the 69.5 µs latency and 77% LUT figures. Needs **AMD Vitis
    - **Utilization**: LUT ≈ 77%, DSP ≈ 22%, BRAM ≈ 58%
    - Per-loop **II = 1** on the conv and FC pipelines, timing met (positive slack).
 
-## Level 3 — Run on the actual KV260 board
+## Level 3: Run on the actual KV260 board
 
 Needs the board, Vitis, and the `kv260_custom` platform you built in Lab 1.
 
@@ -140,7 +140,7 @@ package), `lenet5_host` (ARM/XRT: MNIST accuracy + custom-image inference), plus
 the same Level 1 command, just changing the folder name.
 
 ## Other files
-- `docs/COMP4601 Project Slides.pdf` — project brief.
-- `LICENSE.txt` — MIT; the LeNet core is ported from Universitat Politècnica de
+- `docs/COMP4601 Project Slides.pdf`: project brief.
+- `LICENSE.txt`: MIT; the LeNet core is ported from Universitat Politècnica de
   València (attribution in each `lenet5_*/README.md`).
-- `UPDATES.md` — log of scope/direction changes.
+- `UPDATES.md`: log of scope/direction changes.
