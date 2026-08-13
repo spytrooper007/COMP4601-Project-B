@@ -1,155 +1,215 @@
-# LeNet-5 (float) — Vitis HLS
+# conv5x5 Accelerator — Vitis Host Flow
 
-Full LeNet-5-style CNN for MNIST in C++ for High-Level Synthesis. This is the
-"extend to the full network" target of the project; the standalone single-layer
-accelerator lives in [`../conv5x5`](../conv5x5).
+Standalone 5×5 convolution + ReLU kernel accelerated on the Kria KV260 FPGA
+using Vitis HLS and XRT. The host program (`conv5x5_host.cpp`) loads the
+compiled bitstream, transfers data to the device, runs the kernel, and checks
+the FPGA output against a plain-C golden reference before reporting a speedup
+over an ARM software baseline.
 
-## Source / attribution
+---
 
-Ported from the reference implementation:
+## What this accelerator does
 
-- **Lenet5FloatHLS** — David de Andrés & Juan Carlos Ruiz, Fault-Tolerant
-  Systems, Instituto ITACA, Universitat Politècnica de València.
-  <https://git.upv.es/defadas/Lenet5FloatHLS> (commit `6277ee1`), MIT License.
+A single-layer, single-channel 5×5 convolution with ReLU activation:
 
-The original targets the Zynq UltraScale+ ZCU104 (XCZU7EV) with Vitis HLS 2023.1
-— the same UltraScale+ family as the Kria KV260 (XCK26), so the HLS flow carries
-over. All original copyright headers and `LICENSE.txt` are preserved.
+| Parameter | Value |
+|-----------|-------|
+| Input     | 1 channel × 32 × 32 (1024 floats) |
+| Kernel    | 5×5, 6 output channels (150 weights + 6 biases) |
+| Output    | 6 channels × 28 × 28 (4704 floats) |
+| Activation | ReLU (in-kernel) |
 
-### Local changes from upstream
-- `hls/include/test/test_padding_1.h`: fixed the include `oracle/cnn_pad1_res.h`
-  → `oracle/cnn_Pad1_res.h`. Upstream was developed on a case-insensitive
-  filesystem; Linux (and Vitis on the KV260) is case-sensitive and would not
-  compile without this.
+The kernel (`conv5x5.cpp`) uses fixed-point types (`ap_fixed<20,8>` for data,
+`ap_fixed<40,16>` for accumulators) during synthesis, with `m_axi` interfaces
+for the four float buffers and an `s_axilite` control interface. On the CPU
+side (testbench and host), all types fall back to `float`.
 
-## Architecture
+---
 
-Input `1×28×28`, zero-padded to `32×32`. A reduced LeNet-5 (fewer feature maps
-than the classic 6/16/120 to keep it small, as the slides plan):
-
-| Layer      | Op                        | Output    |
-|------------|---------------------------|-----------|
-| padding_1  | zero-pad 2                | 1×32×32   |
-| conv1+ReLU | 3 kernels, 5×5            | 3×28×28   |
-| maxPool_1  | 2×2                       | 3×14×14   |
-| padding_2  | zero-pad 2                | 3×18×18   |
-| conv2+ReLU | 6 kernels, 5×5            | 6×14×14   |
-| maxPool_2  | 2×2                       | 6×7×7     |
-| flatten    | —                         | 294       |
-| fc1        | 294 → 147                 | 147       |
-| fc2        | 147 → 10                  | 10 logits |
-
-`hls/src/core/cnn.cpp` is the HLS top with `s_axilite`/`m_axi` interfaces —
-this is the **hardware** kernel. The same C++ compiled for the CPU is the
-**software** baseline.
-
-## Layout
+## File layout
 
 ```
-hls/include/core/   layer headers, cnn_defines.h, trained weights & biases, input images
-hls/include/test/   testbench headers + oracle/ per-layer golden vectors
-hls/src/core/       layer implementations (padding, conv, maxpool, flatten, FC) + cnn.cpp top
-hls/src/test/       cnntest.cpp (main) + per-layer + whole-network tests
+conv5x5_accel/
+├── conv5x5.h              # Dimension macros + type aliases (float / ap_fixed)
+├── conv5x5.cpp            # HLS kernel — top function conv5x5()
+├── conv5x5_test.cpp       # C-simulation testbench (golden comparison, RMSE)
+├── conv5x5_host.cpp       # XRT host program (correctness + timing vs ARM)
+├── hls_config.cfg         # Vitis HLS component config (top, sources, -I paths)
+├── vitis-comp.json        # HLS component descriptor
+├── vitis-sys.json         # System (hw_link + package) descriptor
+└── lenet5_host/           # Vitis host component (CMakeLists, cmdlineparser, …)
 ```
 
-## Build & run C-simulation (host CPU, no board needed)
+---
+
+## Step 1 — C-simulation (no board needed)
+
+Compile the testbench directly with g++ to verify correctness before touching
+Vitis:
 
 ```bash
-cd hls
-g++ -O2 -w -std=c++14 \
-    -Iinclude/core -Iinclude/test -Iinclude/test/oracle \
-    src/core/*.cpp src/test/*.cpp -o lenet5_csim
-
-./lenet5_csim <op> <from_image> <to_image>
-#   op 0 = whole CNN classification, 1..9 = individual layers vs oracle
-./lenet5_csim 0 0 100      # classify images 0..99, print accuracy
+cd conv5x5_accel
+g++ -O2 -std=c++14 -o conv5x5_csim conv5x5.cpp conv5x5_test.cpp
+./conv5x5_csim
 ```
 
-Verified: `./lenet5_csim 0 0 20` classifies the first 20 MNIST images correctly
-(100%).
+Expected output:
 
-## Open in Vitis & run C-sim
+```
+----------------------------------------------
+   Conv5x5  RMSE
+0.000000000000000
+----------------------------------------------
+*******************************************
+PASS: The output matches the golden output!
+*******************************************
+```
+
+The testbench generates a fixed, deterministic input (`(i%17 − 8) × 0.1`),
+weight set (`(i%7 − 3) × 0.05`), and bias (`(i − 3) × 0.02`), computes a
+double-precision golden reference, runs the HLS function, and checks that the
+RMSE is below `1e-3`. The same data is used by the host program so the two
+comparisons are consistent.
+
+---
+
+## Step 2 — Open in Vitis and run C-simulation
 
 This folder is a Vitis workspace. Open it directly:
-`File ▸ Open Workspace… ▸ Project/lenet5`  (or `vitis -w Project/lenet5`).
 
-Three components are pre-configured (mirrors dft256 / conv5x5):
-
-| Component        | Type       | Notes |
-|------------------|------------|-------|
-| `lenet5_hls`     | HLS        | top = `cnn`; all `hls/src/core/*.cpp` as synth sources, `hls/src/test/*.cpp` as testbench, `-I` paths set in `hls_config.cfg` |
-| `lenet5_system`  | System (hw_link + package) | `nk=cnn:1:cnn_1` |
-| `lenet5_host`    | Host (ARM/XRT) | MNIST accuracy + custom-image inference |
-
-**To run C-simulation:** select **`lenet5_hls`** → *Run ▸ C Simulation*. With no
-testbench args it classifies MNIST image 0 (`test_cnn`, op 0). To sweep a range,
-set testbench arguments `0 0 100` in the component's run settings (op, from, to).
-
-> Open `Project/lenet5` itself as the workspace (not the parent `Project/`).
-
-## The weights — what to use
-
-**You don't pass weights at runtime.** The trained parameters are compiled
-*into* the kernel as `static const` arrays in
-[`hls/include/core/cnn_weights_and_bias_all_layers.h`](hls/include/core/cnn_weights_and_bias_all_layers.h),
-so they end up baked into the bitstream. The host only sends the 28×28 image and
-reads back 10 logits. The eight arrays (from the UPV reference, PyTorch-trained
-on MNIST) are:
-
-| Array            | Shape            | Layer |
-|------------------|------------------|-------|
-| `KERNEL_CONV_1`  | `[3][1][5][5]`   | conv1 weights |
-| `BIAS_CONV_1`    | `[3]`            | conv1 bias |
-| `KERNEL_CONV_2`  | `[6][3][5][5]`   | conv2 weights |
-| `BIAS_CONV_2`    | `[6]`            | conv2 bias |
-| `WEIGHTS_FC1`    | `[147][294]`     | fc1 weights |
-| `BIAS_FC1`       | `[147]`          | fc1 bias |
-| `WEIGHTS_FC2`    | `[10][147]`      | fc2 weights |
-| `BIAS_FC2`       | `[10]`           | fc2 bias |
-
-To use **your own** weights, retrain the same architecture (see the layer shapes
-in the table above / `cnn_defines.h`) and regenerate that one header with the
-identical array names and shapes — nothing else changes. The current weights
-already give 100 % on the bundled 100-image MNIST test set.
-
-## Run on the KV260 (host)
-
-Build the `lenet5_system` (→ `lenet5.bin`) and `lenet5_host`, deploy like dft256
-(copy `lenet5.bin` / `pl.dtbo` / `shell.json` to `/lib/firmware/xilinx/lenet5/`,
-`sudo xmutil loadapp lenet5`), then:
-
-### MNIST accuracy test
-```bash
-./lenet5_host -x lenet5.bin            # classify 100 MNIST images, print accuracy
-./lenet5_host -x lenet5.bin -n 50      # first 50 images
 ```
-Prints per-image `predicted vs actual`, an overall accuracy %, and an
-FPGA-vs-ARM timing/speedup block (labels come from `res_cnn_real` in
-`mnist_labels_and_predictions.h`).
-
-### Classify your own image
-```bash
-./lenet5_host -x lenet5.bin -i sample_images/digit7_raw.txt              # raw 0..255 (default)
-./lenet5_host -x lenet5.bin -i sample_images/digit7_std.txt -f std       # already normalized
-./lenet5_host -x lenet5.bin -i mydigit.txt -f raw -l 7                   # check against label 7
+File ▸ Open Workspace… ▸ conv5x5_accel/
 ```
-The image file is **784 numbers** (28×28, row-major, any whitespace/comma
-separated). `--format`:
-- `raw`  (default) — pixels `0..255`, host applies MNIST normalization `(p/255 − 0.1307) / 0.3081`
-- `unit` — pixels `0..1`
-- `std`  — values already standardized (pass-through)
 
-Output: an ASCII preview of your image, the 10 logits + soft-max probabilities,
-and the predicted digit. Two ready examples are in
-[`sample_images/`](sample_images) (image 0, a "7"), which you can also use as a
-template for your own.
+or from the terminal:
 
-> **Normalization matters:** the model was trained on standardized MNIST
-> (background = −0.4242). If you feed raw pixels without `--format raw`, the
-> prediction will be garbage. `sample_images/digit7_raw.txt` +
-> `-f raw` and `sample_images/digit7_std.txt` + `-f std` were both verified to
-> predict 7.
+```bash
+vitis -w conv5x5_accel/
+```
 
-Both sample files, the normalization, and the accuracy path are verified through
-the software network on the host CPU; the XRT plumbing mirrors the working
-dft256 / conv5x5 hosts.
+Three components are pre-configured:
+
+| Component | Type | Notes |
+|-----------|------|-------|
+| `conv5x5_hls` | HLS | top = `conv5x5`; `conv5x5.cpp` as synth source, `conv5x5_test.cpp` as testbench |
+| `conv5x5_system` | System (hw_link + package) | `nk=conv5x5:1:conv5x5_1` |
+| `lenet5_host` | Host (ARM / XRT) | Correctness check + timing benchmark |
+
+To run C-simulation in Vitis: select **`conv5x5_hls`** → *Run ▸ C Simulation*.
+This calls `conv5x5_test.cpp::main()` and prints the same RMSE / PASS block as
+above.
+
+---
+
+## Step 3 — Synthesise and build the bitstream
+
+In the Vitis GUI:
+
+1. Select **`conv5x5_hls`** → *Run ▸ C Synthesis* (targets the KV260 / XCK26 at 300 MHz by default in `hls_config.cfg`).
+2. Select **`conv5x5_system`** → *Build* to run `v++` link and package. This produces `conv5x5.bin` and the associated `pl.dtbo` / `shell.json`.
+
+Or from the command line (after sourcing the Vitis environment):
+
+```bash
+vitis -s conv5x5_accel/hls_config.cfg   # synthesis only
+```
+
+---
+
+## Step 4 — Deploy to the KV260
+
+Copy the packaged output to the board and load the overlay:
+
+```bash
+# On the host PC — copy files to the board
+scp conv5x5.bin pl.dtbo shell.json petalinux@<board-ip>:~/
+
+# On the board
+sudo mkdir -p /lib/firmware/xilinx/conv5x5
+sudo cp conv5x5.bin pl.dtbo shell.json /lib/firmware/xilinx/conv5x5/
+sudo xmutil unloadapp
+sudo xmutil loadapp conv5x5
+```
+
+---
+
+## Step 5 — Build and run the host program
+
+The host is built by Vitis as part of the `lenet5_host` component. To build
+manually on the board (or cross-compile with the sysroot):
+
+```bash
+# On the KV260 directly (XRT already installed)
+g++ -std=c++14 -O2 \
+    -I/usr/include/xrt \
+    -o conv5x5_host \
+    conv5x5_host.cpp lenet5_host/cmdlineparser.cpp \
+    -lxrt_coreutil -lpthread -lrt -lstdc++
+```
+
+Run:
+
+```bash
+./conv5x5_host -x conv5x5.bin
+```
+
+---
+
+## What the host program checks
+
+### Correctness vs golden output
+
+The host generates the same deterministic test vectors as `conv5x5_test.cpp`
+and computes the golden output on the ARM CPU using `conv5x5_sw()` (a plain-C
+double-loop convolution). After the FPGA run it compares element-by-element and
+reports the RMSE:
+
+```
+----------------------------------------------
+Conv5x5 RMSE : 0.000000000000000
+PASS: matches golden output
+----------------------------------------------
+```
+
+A result is considered correct if RMSE < `1e-3`. The fixed-point types used in
+synthesis (`ap_fixed<20,8>` / `ap_fixed<40,16>`) introduce small quantisation
+errors but stay well within this threshold.
+
+### Performance vs ARM software baseline
+
+The host then runs both the FPGA kernel and the ARM software convolution 1000
+times each and reports average latency and speedup:
+
+```
+--- Performance (avg over 1000 runs) ---
+FPGA time :  XX.XXX us
+ARM  time : XXX.XXX us
+Speedup   : X.XXx
+```
+
+The FPGA timing covers the full XRT round-trip: `sync to device → kernel
+execution → sync from device`. The ARM timing runs the same plain-C reference
+loop. The speedup figure is `ARM avg / FPGA avg`.
+
+---
+
+## Key HLS optimisations in conv5x5.cpp
+
+| Pragma | Effect |
+|--------|--------|
+| `PIPELINE II=1` on `conv_OW` | One output pixel initiated per clock cycle |
+| `ARRAY_PARTITION complete` on `w_buf` (dim 3, 4) | All 25 kernel weights available in parallel |
+| `ARRAY_PARTITION complete` on `in_buf` (dim 1) | All input channels read simultaneously |
+| Tree-reduction of 25 products into a 32-element balanced adder tree | Reduces accumulation depth, improves timing |
+| Separate `gmem0 / gmem1 / gmem2` AXI bundles | Input, weights+bias, and output use independent memory ports — no bank conflicts |
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---------|-------------|-----|
+| `FAIL: does not match golden output` | Bitstream is stale or wrong `.bin` loaded | Rebuild `conv5x5_system`; confirm `xmutil loadapp conv5x5` succeeded |
+| `xclbin` open fails | Wrong device index or overlay not loaded | Run `sudo xmutil loadapp conv5x5` first; use `-d 0` |
+| RMSE > 0 but < 1e-3 | Expected — fixed-point quantisation | Normal; the threshold is intentionally generous |
+| Very low speedup | XRT transfer overhead dominates for this small kernel size | Expected for a single-layer benchmark; full-network speedup (see `lenet5_unoptimised`) is more representative |
