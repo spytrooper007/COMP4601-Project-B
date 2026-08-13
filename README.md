@@ -1,9 +1,9 @@
-# COMP4601 Project B — CNN Acceleration on the Kria KV260
+# COMP4601 Project B: CNN Acceleration on the Kria KV260
 
 HLS implementations of a **LeNet-inspired CNN** (2 conv + 2 FC) for MNIST, taken
 from an unoptimised baseline through progressive hardware acceleration on the
 KV260 (`xck26`, 200 MHz). The point of the project is the **acceleration
-methodology** — the CNN is the representative workload.
+methodology**, the CNN is the representative workload.
 
 ## Workspaces (the acceleration progression)
 
@@ -136,7 +136,7 @@ Every `lenet5_*` folder is a self-contained Vitis workspace with the same
 components: `lenet5_hls` (HLS kernel, top = `cnn`), `lenet5_system` (hw_link +
 package), `lenet5_host` (ARM/XRT: MNIST accuracy + custom-image inference), plus
 `hls/` (sources + trained weights + MNIST data) and `sample_images/`. Only the
-`hls/src/core/` layer code differs between them — so you can test any variant with
+`hls/src/core/` layer code differs between them, so you can test any variant with
 the same Level 1 command, just changing the folder name.
 
 ## Other files
