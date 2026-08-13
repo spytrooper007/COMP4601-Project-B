@@ -5,14 +5,13 @@ from an unoptimised baseline through progressive hardware acceleration on the
 KV260 (`xck26`, 200 MHz). The point of the project is the **acceleration
 methodology**, the CNN is the representative workload.
 
-## Workspaces (the acceleration progression)
+## Workspaces
 
 | Folder | What | Latency¹ | Speedup | LUT | Accuracy |
 |--------|------|---------:|--------:|----:|:--------:|
 | [`lenet5_unoptimised/`](lenet5_unoptimised) | Baseline: sequential, no perf pragmas | 6011 µs | 1.0× | 21% | 100% |
 | [`lenet5_conv_accel/`](lenet5_conv_accel) | Convolution layers accelerated (fixed-point + adder tree) | 2057 µs | 2.9× | 36% | 100% |
 | [`lenet5_full_accel/`](lenet5_full_accel) | Conv **and** FC accelerated (FC unroll ×16) — **best / deployed** | **69.5 µs** | **87×** | 77% | 100% |
-| [`conv5x5_unoptimised/`](conv5x5_unoptimised) | Standalone single 5×5 conv accelerator (baseline) | — | — | — | 100% |
 
 ¹ Vitis HLS C-synthesis estimate for one image @200 MHz. Accuracy = MNIST 100-image
 test set, verified in both float and the `ap_fixed<20,8>` fixed-point datapath.
@@ -36,7 +35,7 @@ test set, verified in both float and the `ap_fixed<20,8>` fixed-point datapath.
 testing, from easiest to most complete. **Level 1 needs nothing but a C++
 compiler**, start there.
 
-## Level 1: Verify accuracy on any PC (no board, no Vitis, ~2 min)
+## Level 1: Verify accuracy on any PC
 
 The HLS kernel is plain C++ (the hardware pragmas are ignored by a normal
 compiler), so the whole network runs on any Linux/macOS machine with `g++`.
@@ -65,7 +64,7 @@ That confirms the design is functionally correct. (This is the **float** path;
 the on-board hardware uses `ap_fixed<20,8>`, which we verified separately also
 gives 100%.)
 
-## Level 2: Reproduce the performance numbers in Vitis (C-synthesis, no board)
+## Level 2: Reproduce the performance numbers in Vitis
 
 This regenerates the 69.5 µs latency and 77% LUT figures. Needs **AMD Vitis
 2025.x** (Unified IDE) installed.
