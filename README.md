@@ -124,6 +124,63 @@ Needs the board, Vitis, and the `kv260_custom` platform you built in Lab 1.
    ./lenet5_host -x lenet5.bin -i sample_images/digit7_std.txt -f std   # already normalized
 
    ```
+---
+ 
+## Interactive Draw Demo (`draw_demo_app.py`)
+ 
+A small desktop app that lets you hand-draw a digit with the mouse and classify
+it live on the board, on both the hardware and software paths side by side, for
+demo purposes.
+ 
+**What it does:** you draw a digit on a single canvas, then click either
+**Classify Hardware** or **Classify Software**. Each button preprocesses the
+drawing into the same 28×28 raw-pixel text format used by
+`sample_images/digit7_raw.txt` above, `scp`s it to the board as
+`live_digit.txt`, and runs `lenet5_host` over SSH with the corresponding flag.
+Results (predicted digit, per-digit confidence bar chart, and measured
+inference time in µs) are shown in two independent result panels so the same
+drawing can be compared across both paths.
+ 
+**Prerequisites:**
+- The board must be running the `lenet5_full_accel` bitstream before you start
+  the app — the draw demo doesn't load anything itself, it just calls
+  `lenet5_host` against whatever's already loaded. SSH in and confirm/load it:
+```bash
+  ssh petalinux@<board-ip>
+  sudo xmutil listapps        # check if "lenet5" is already loaded
+  sudo xmutil unloadapp
+  sudo xmutil loadapp lenet5
+```
+  (See Level 3, step 4 above for the full deploy steps if `lenet5` isn't
+  installed under `/lib/firmware/xilinx/lenet5/` on the board yet at all.)
+- Python 3 with Pillow and tkinter:
+```bash
+  pip install pillow
+  sudo apt install python3-tk   # if tkinter isn't already available
+```
+- Passwordless SSH to the board already set up (`ssh petalinux@<board-ip> echo ok`
+  must return with no password prompt), so the app never stalls waiting for
+  input.
+- `lenet5_host` on the board must have the **`-s`/`--sw_image`** flag, which
+  runs the custom image through the plain ARM software `cnn()`
+  path (no FPGA) and prints its own timing, mirroring what `-i` does for
+  hardware. Both flags also print their own single-image timing
+  (`FPGA time : ...` / `ARM  time : ...`).
+**Config:** edit the constants near the top of the script (`BOARD_USER`,
+`BOARD_IP`, and the remote paths) to match your own board deployment before
+running.
+ 
+**Run:**
+```bash
+python3 draw_demo_app_final.py
+```
+ 
+**Note on timing:** a single drawn-digit classification is always a "cold
+start" (a fresh process opening the device and loading the kernel for just one
+image), so its timing will read a bit higher than the batch-mode average from
+step 5 above, which is measured across 100 images once everything is already
+warmed up. Both are measure different things: one-shot
+latency vs. sustained throughput.
 
 ---
 
