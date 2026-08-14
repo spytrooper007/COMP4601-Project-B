@@ -16,10 +16,6 @@ methodology**, the CNN is the representative workload.
 ¹ Vitis HLS C-synthesis estimate for one image @200 MHz. Accuracy = MNIST 100-image
 test set, verified in both float and the `ap_fixed<20,8>` fixed-point datapath.
 
-**Full measured results and the reasoning behind each step:**
-[`lenet5_full_accel/ACCELERATION_RESULTS.md`](lenet5_full_accel/ACCELERATION_RESULTS.md)
-· how-to for going further: [`lenet5_full_accel/ACCELERATION_GUIDE.md`](lenet5_full_accel/ACCELERATION_GUIDE.md).
-
 ### Headline findings
 - Accelerating the **conv alone** only gave 2.9×, the real bottleneck was FC1.
 - Accelerating the **FC layers** unlocked the jump to 72–87×.
@@ -126,6 +122,7 @@ Needs the board, Vitis, and the `kv260_custom` platform you built in Lab 1.
    ```bash
    ./lenet5_host -x lenet5.bin -i sample_images/digit7_raw.txt          # raw 0..255 (default)
    ./lenet5_host -x lenet5.bin -i sample_images/digit7_std.txt -f std   # already normalized
+
    ```
 
 ---
